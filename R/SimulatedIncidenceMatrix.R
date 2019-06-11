@@ -36,13 +36,24 @@ SimulatedIncidenceMatrix <- R6Class(
       ##  private$ncore = detectCores()
       ##  private$parallelEnvironment = makeCluster(private$ncore)
       ##}
-      if('AbstractSimulatedIncidenceMatrix' %in% class(data)){
-        private$.arr= data$simulations
-        #private$.arr= array(data$arr,c(data$nrow,data$ncol,nsim))
+      if('array' %in% class(data)){
+        private$.arr = data
+        private$.dims = dim(data)
+        private$.ndim = length(dim(data))
+        private$.dnames = dimnames(data)
+        return()
+      } else if(('ArrayData' %in% class(data)) & (nsim == 1)){
+        private$.arr= data$arr
         private$.metaData = data$metaData
         private$.dimData = data$dimData
         private$.dnames = data$dnames
         private$.dims = data$dims
+        while(length(private$.dims) <= 2){
+          private$.dims = c(private$.dims,1)
+        }
+        if(length(dim(private$.arr)) <= 3){
+          private$.arr = array(private$.arr,private$.dims)
+        }
         private$.ndim = length(self$dims)
         return()
       }
@@ -575,15 +586,16 @@ SimulatedIncidenceMatrix <- R6Class(
     #' @method mutate This function changes the information stored in \code{self$simulations}
     #' @param rows The rows to change.
     #' @param cols The columns to change.
+    #' @param sims Which simulations to affect.
     #' @param data The data to change to.  Can be either array-like or matrix-like.  If its matrix-like it will overwrite all of the dimensions.
-    mutate = function(rows,cols,data){
+    mutate = function(rows,cols,sims,data){
       ##For debugging
       if('mutate' %in% private$.debug){
         browser()
       }
       ##Testing this:
-      tmpdata = data
-      tmpdata = array(data,self$dims)
+      # tmpdata = data
+      # tmpdata = array(data,self$dims)
       data = as.array(data)
 
       if(missing(rows)){
@@ -602,6 +614,9 @@ SimulatedIncidenceMatrix <- R6Class(
           rownames(private$.arr) = self$rnames
         }
       }
+      if(missing(sims)){
+        sims = 1:self$nsim
+      }
       ##Check the size of the data
       ##Make this work better...
       if(is.null(dim(data))){
@@ -618,14 +633,14 @@ SimulatedIncidenceMatrix <- R6Class(
       }
       if(length(dim(data)) == 3){
         ##The data is an array
-        if(dim(data)[[3]] == self$nsim){
+        if(dim(data)[[3]] == length(sims)){
           private$.arr[rows,cols,] = data
         } else if(dim(data)[[3]] == 1){
-          private$.arr[rows,cols,] = replicate(self$nsim,data)
+          private$.arr[rows,cols,] = replicate(length(sims),data)
         }
       }
       else{
-        private$.arr[rows,cols,] = replicate(self$nsim,data)
+        private$.arr[rows,cols,sims] = data
       }
     },
     #' @method summarize Apply a function to every simulation.

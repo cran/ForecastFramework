@@ -99,13 +99,13 @@ MatrixData <- R6Class(
       private$defaultActive('.rowData','private',value)
     },
     #' @field cellData A list of metadata associated with the cells of the data.
-    # cellData = function(value){
-    #   ## AbstractClasses.R::Generic::defaultActive
-    #   if(missing(value)){
-    #     return(private$.cellData)
-    #   }
-    #   private$defaultAbstract()
-    # },
+    cellData = function(value){
+      ## AbstractClasses.R::Generic::defaultActive
+      if(missing(value)){
+        return(private$.cellData)
+      }
+      private$defaultAbstract()
+    },
     ##Change this so nrow and ncol cannot be written to directly
     #' @field nrow The number of rows in the data
     nrow = function(value){
@@ -139,11 +139,8 @@ MatrixData <- R6Class(
       if('rnames' %in% private$.debug){
         browser()
       }
-      if(missing(value)){
-        return(private$.rnames)
-      }
-      ##We could allow modifing the row names directly...
-      stop("Do not modify the row names directly")
+      if(!missing(value)){stop("Do not write directly to the row names")}
+      return(private$.rnames)
     },
     #' @field cnames The names of columns in the data.
     cnames = function(value){
@@ -151,11 +148,8 @@ MatrixData <- R6Class(
       if('cnames' %in% private$.debug){
         browser()
       }
-      if(missing(value)){
-        return(private$.cnames)
-      }
-      ##We could allow modifing the column names directly...
-      stop("Do not modify the column names directly")
+      if(!missing(value)){stop("Do not write directly to the column names")}
+      return(private$.cnames)
     },
     #' @field mat This is the matrix.  For extensibility, it cannot be written to directly and must be modified through methods.
     mat = function(value){
@@ -257,6 +251,34 @@ AbstractIncidenceMatrix <- R6Class(
     mutate = function(rows,cols,data){
       ## AbstractClasses.R::Generic::defaultAbstract
       private$defaultAbstract()
+    }
+  ),
+  active = list(
+    #' @field rnames The names of rows in the data.
+    rnames = function(value){
+      ## for debugging: see AbstractClasses::Generic::debug for details.
+      if('rnames' %in% private$.debug){
+        browser()
+      }
+      if(missing(value)){return(private$.rnames)}
+      if(length(value) != private$.nrow){
+        stop("Row names must be the same length as number of rows")
+      }
+      rownames(private$.mat) = value
+      private$.rnames = value
+    },
+    #' @field cnames The names of columns in the data.
+    cnames = function(value){
+      ## for debugging: see AbstractClasses::Generic::debug for details.
+      if('cnames' %in% private$.debug){
+        browser()
+      }
+      if(missing(value)){return(private$.cnames)}
+      if(length(value) != private$.ncol){
+        stop("Column names must be the same length as number of columns")
+      }
+      colnames(private$.mat) = value
+      private$.cnames = value
     }
   )
 )
@@ -367,8 +389,6 @@ ArrayData <- R6Class(
     	} else{
     		warning("The binding has come undone.")
     	}
-      ##We could allow modifing the row names directly...
-      stop("Do not modify the column names directly")
     },
     #' @field cnames The names of columns in the data.
     cnames = function(value){
@@ -608,6 +628,46 @@ AbstractSimulatedIncidenceMatrix <- R6Class(
     #' @field simulations  The array of simulations.  This is another name for 'arr'.
     simulations = function(value){
       private$defaultActive('.arr','private',value)
+    },
+    #' @field dnames The names of dimensions of the data.
+    dnames = function(value){
+      if('dnames' %in% private$.debug){
+        browser()
+      }
+      #Replace with a super$dnames call later
+      if(missing(value)){
+        return(private$.dnames)
+      } else if(is.null(value)){
+        private$.dnames=NULL
+      } else if((class(value) == 'list')){
+        nval = length(value)
+        if(nval <= self$ndim){
+          if(all(mapply(function(self,other){
+            ## Check that this works
+            (is.null(other)) || (self==length(other))
+          },
+          self=self$dims[1:nval],
+          other=value
+          ))){
+            private$.dnames[!sapply(value,is.null)] = value[!sapply(value,is.null)]
+          } else{
+            stop("The dimensions don't match up")
+          }
+        } else{
+          stop("Invalid number of dimensions.")
+        }
+      } else if((class(value) == 'character') & (length(value) == self$ndim)){
+        if(any(self$dims[which(!is.na(value))] != 1)){
+          stop("The dimensions don't match up")
+        }
+        private$.dnames[which(!is.na(value))] = value[which(!is.na(value))]
+      } else{
+        stop(paste("Not sure how to make dimension metaData from object of class",class(value)))
+      }
+      if((!is.null(private$.dnames)) && (length(private$.dnames) < self$ndim)){
+        private$.dnames[[self$ndim]] = NULL
+      }
+      dimnames(private$.arr) <- private$.dnames
     }
   )
 )
@@ -672,8 +732,8 @@ FrameData <- R6Class(
   classname = "FrameData",
   inherit = ArrayData,
   private = list(
-    #' @importFrom dplyr data_frame
-    .frame = data_frame()
+    #' @importFrom tibble tibble
+    .frame = tibble()
   ),
   active = list(
     #' @field frame The data frame this class is responsible for.
@@ -703,8 +763,8 @@ AbstractObservationList <- R6Class(
     ##Variables starting with a '.' represent hidden values corresponding to
     ##active bindings of the same name without the .
     ##Typing is not as strong as it could be here...
-    #' @importFrom dplyr data_frame
-    .frame = data_frame(),
+    #' @importFrom tibble tibble
+    .frame = tibble(),
     updateArray = function(){
       private$defaultAbstract()
     }
@@ -749,8 +809,8 @@ RelationalData <- R6Class(
   classname = "RelationalData",
   inherit = FrameData,
   private = list(
-    #' @importFrom dplyr data_frame
-    .tables = list(data_frame())
+    #' @importFrom tibble tibble 
+    .tables = list(tibble())
   ),
   active = list(
     #' @field tables The tables which make up the relational database.
@@ -778,8 +838,8 @@ AbstractRelationalTables <- R6Class(
   inherit = RelationalData,
   private = list(
     ##Variables starting with a '.' represent hidden values corresponding to active bindings of the same name without the .
-    #' @importFrom dplyr data_frame
-    .tables = list(data_frame()),
+    #' @importFrom tibble tibble 
+    .tables = list(tibble()),
     ##.keys will store the column names for the identifying columns for the
     ##  tables.
     .keys = list(character()),

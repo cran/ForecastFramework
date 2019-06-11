@@ -27,12 +27,13 @@ ObservationList<- R6Class(
   inherit = AbstractObservationList,
   private = list(
     .aggregate = NULL,
-    .frame = data_frame(),
+    .frame = tibble::tibble(),
     aCurrent = FALSE,
     .aDims = list(),
     .aVal = '',
     .slice = 1,
     .aDimData = list(),
+    .aCellData= character(0),
     na.rm = FALSE,
     updateArray = function(na.rm = private$na.rm){
       if('updateArray' %in% private$.debug){
@@ -98,9 +99,11 @@ ObservationList<- R6Class(
       } else {
         stop("array metadata should be a list of columns in the data frame.")
       }
+      ## This should not fail when the dimData is NULL
       private$.dimData = mapply(dim=self$aDims,data=self$aDimData,function(dim,data){
         self$frame %>%
-          group_by_(dim) %>%
+          group_by_(.dots=dim) %>%
+          select_(.dots=data) %>%
           self$aggregate() %>%
           ungroup() %>%
           select_(.dots=data) %>%
@@ -115,6 +118,21 @@ ObservationList<- R6Class(
           }
         })
       }
+      private$.cellData = lapply(
+        self$aCellData,
+        function(data){
+          self$frame %>%
+          #' @importFrom dplyr group_by_
+          group_by_(.dots=setNames(self$aDims,NULL)) %>%
+          self$aggregate() %>%
+          #' @importFrom dplyr ungroup
+          ungroup() %>%
+          #' @importFrom reshape2 acast
+          acast(as.formula(paste(self$aDims,collapse='~')),value.var=data) %>%
+          return
+        }
+      )
+      names(private$.cellData) <- self$aCellData
       private$aCurrent <- TRUE
     }
   ),
@@ -122,13 +140,20 @@ ObservationList<- R6Class(
     #' @method initialize Create a new ObservationList with \code{frame} given by \code{data}
     #' @param data A data frame to use as the frame of the ObservationList
     #' @param \dots A list of arguments to pass to the formArray function.  These arguments determine how the ObservationList behaves as an ArrayData objec.
-    #' @importFrom dplyr data_frame
-    initialize = function(data=data_frame(),...){
-    	#' @importFrom dplyr as_data_frame
-      self$frame <- as_data_frame(data)
+    #' @importFrom tibble tibble
+    initialize = function(data=tibble::tibble(),...){
+    	#' @importFrom tibble as_tibble
+      if("FrameData" %in% class(data)){
+        self$frame = data$frame
+      } else if(!is.null(data$frame)){
+        self$frame <- data$frame
+      } else {
+        self$frame <- as_tibble(data)
+      }
+     
       self$formArray(...)
       ## Note: We need to define aggregate here (instead of in the public list), because things defined in lists are locked, and we want users to be able to modify the .aggregate function
-      private$.aggregate = function(input_data){
+      private$.aggregate = function(input_data,na.rm=private$na.rm){
         if('aggregate' %in% private$.debug){
           browser()
         }
@@ -138,8 +163,9 @@ ObservationList<- R6Class(
           #' @importFrom dplyr summarize_all
           #' @importFrom dplyr funs
           summarize_all(funs(
-            sum = if(is.numeric(.) || is.logical(.)){sum(.,na.rm=private$na.rm)} else{NA},
+            sum = if(is.numeric(.) || is.logical(.)){sum(.,na.rm=na.rm)} else{NA},
             unique = if(length(unique(.))==1){unique(.)} else{list(unique(.))})) ->
+            # unique = if(length(unique(.))==1){unique(NA)} else{NA})) ->
           input_data
         input_data %>%
           group_by_(.dots=grouping) ->
@@ -155,7 +181,8 @@ ObservationList<- R6Class(
             rename_(.dots=setNames('unique',paste(private$.aVal,'_unique',sep=''))) ->
             input_data
         }
-        column_names = c(unlist(sapply(private$.aDimData,function(x){paste(x,"_unique",sep='')})),paste(private$.aVal,'_sum',sep=''))
+        column_names = c(unlist(sapply(private$.aDimData,function(x){paste(x,"_unique",sep='')})),paste(private$.aVal,'_sum',sep=''),paste(private$.aCellData,'_unique',sep=''))
+        names(column_names) <- column_names
         column_names = column_names[column_names %in% names(input_data)]
         input_data %>%
           select_(.dots=column_names) ->
@@ -183,7 +210,7 @@ ObservationList<- R6Class(
     #' @param val The attribute of frame to use for the values of the array (must \code{aggregate}_ to a numeric type)
     #' @param dimData A list containing for each dimension of the array, the attribute(s) of \code{frame} which are associated with that dimension.
     #' @param metaData The attribute(s) of frame to store in metaData so they can be accessed by methods expecting a MatrixData object.
-    formArray = function(...,val,dimData=list(),metaData=list()){
+    formArray = function(...,val,dimData=list(),metaData=list(),cellData = list()){
       if('formArray' %in% private$.debug){
         browser()
       }
@@ -199,6 +226,7 @@ ObservationList<- R6Class(
       self$aDims = list(...)
       self$aVal = val
       self$aDimData = dimData
+      self$aCellData = cellData
       ## This next line should be fixed at some point.  All of the other fields
       ##   reset on a new formArray call, but this one doesn't.
       metaDataKeys = names(private$.metaData)[!(names(private$.metaData) %in% names(metaData))]
@@ -213,12 +241,16 @@ ObservationList<- R6Class(
       if('frame' %in% private$.debug){
         browser()
       }
-      private$aCurrent = FALSE
-      if(!missing(value)){
-        private$.rnames = NULL
-        private$.cnames = NULL
+      if(missing(value)){
+        return(private$.frame)
       }
-      private$defaultActive('.frame','private',value)
+      if(!is.data.frame(value)){
+        stop("The frame attribute must be a data frame")
+      }
+      private$aCurrent = FALSE
+      private$.frame = value
+      private$.rnames = NULL
+      private$.cnames = NULL
     },
     #' @field arr An array of aggregate data pulled from the frame.  See \code{formArray} for details
     arr = function(value){
@@ -397,6 +429,19 @@ ObservationList<- R6Class(
       #super$rowData <- value
       self$dimData[[1]] <- value
     },
+    #' @field cellData A list of data associated to the cells of \code{self$arr}
+    cellData = function(value){
+      if('cellData' %in% private$.debug){
+       browser()
+      }
+      if(missing(value)){
+        if(private$aCurrent == FALSE){
+          private$updateArray()
+        }
+        return(private$.cellData)
+      }
+      stop("Do not write directly to the cell data.  Modify the frame instead")
+    },
     #' @field aDims  Variable which stores the column names of \code{self$frame} defining each dimension of \code{self$arr}
     aDims = function(value){
       if('aDims' %in% private$.debug){
@@ -425,6 +470,24 @@ ObservationList<- R6Class(
         stop(paste(value,"is not a column of the frame"))
       }
       private$.aVal = value
+      private$aCurrent = FALSE
+    },
+    #' @field aCellData Variable which stores the column names of \code{self$frame} associated with each dimension of \code{self$arr}, but not defining them.
+    aCellData = function(value){
+      if('aCellData' %in% private$.debug){
+        browser()
+      }
+      if(missing(value)){
+        return(private$.aCellData)
+      }
+      lapply(value,function(value){
+        for(val in value){
+          if(!(val %in% colnames(private$.frame))){
+            stop(paste(val,"is not a column of the frame"))
+          }
+        }
+      })
+      private$.aCellData= value
       private$aCurrent = FALSE
     },
     #' @field aDimData Variable which stores the column names of \code{self$frame} associated with each dimension of \code{self$arr}, but not defining them.
@@ -457,7 +520,7 @@ ObservationList<- R6Class(
         if(private$.ndim == 2){
           return(as.matrix(private$.arr))
         }
-        return(apply(private$.arr,c(1,2),function(x){x[slice]}))
+        return(apply(private$.arr,c(1,2),function(x){x[private$.slice]}))
       }
       stop("Do not write directly to the mat, because it is automatically calculated.  The Observation List is called frame")
     },
@@ -478,10 +541,10 @@ ObservationList<- R6Class(
       }
       private$aCurrent = FALSE
       if(class(value) != 'function'){
-        stop("Not a function.  aggregate should be a function taking a single data_frame argument called input_data")
+        stop("Not a function.  aggregate should be a function taking a single tibble argument called input_data")
       }
       if(length(names(formals(fun=value))) != 1){
-        stop("Not a valid function for aggregation.  A valid aggregation function must take a single data_frame argument.")
+        stop("Not a valid function for aggregation.  A valid aggregation function must take a single tibble argument.")
       }
       private$.aggregate = value
     }

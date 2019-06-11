@@ -44,14 +44,17 @@ Forecast <- R6Class(
     },
     #' @method quantile This \bold{must} be extended.  Get the cutoffs for each percentile in alphas.
     #' @param alphas A numeric vector with elements between \code{0} and \code{1} of percentiles to find cutoffs for.
+    #' @param na.rm A boolean regarding whether to remove NA values before computing the quantiles.
     #' @return an ArrayData.
-    quantile = function(alphas){
+    quantile = function(alphas,na.rm=FALSE){
       private$defaultAbstract()
     },
     #' @method binDist This \bold{must} be extended.  Get the distribution of simulations of the data within fixed bins.
     #' @param cutoffs A numeric vector with elements to use as the dividing values for the bins.
-    #' @return a FrameData.
-    binDist = function(cutoffs){
+    #' @param include.lowest logical, indicating if an x[i] equal to the lowest (or highest, for right = FALSE) breaks value should be included.
+    #' @param right logical, indicating if the intervals should be closed on the right (and open on the left) or vice versa.
+    #' @return an ArrayData.
+    binDist = function(cutoffs,include.lowest = FALSE,right = TRUE){
       private$defaultAbstract()
     }
   ),
@@ -105,39 +108,101 @@ SimulatedForecast <- R6Class(
   ),
   public = list(
     #' @method mean This method extracts the elementwise mean of the forecast.  This function will not change the number of rows or columns in the data, but will convert probabilistic estimates into deterministic ones.
-    mean = function(){
-      self$data$summarize(mean)
+    #' @param trim the fraction (0 to 0.5) of observations to be trimmed from each end of ‘x’ before the mean is computed.  Values of trim outside that range are taken as the nearest endpoint.
+    #' @param na.rm a logical value indicating whether ‘NA’ values should be stripped before the computation proceeds.
+    #' @return An IncidenceMatrix with the mean over all simulations.
+    mean = function(trim = 0,na.rm = FALSE){
+      self$data$summarize(mean,trim,na.rm)
     },
     #' @method median This method extracts the elementwise median of the forecast.  This function will not change the number of rows or columns in the data, but will convert probabilistic estimates into deterministic ones.
     #' @return a MatrixData.
-    median = function(){
-      self$data$summarize(median)
+    #' @param na.rm a logical value indicating whether ‘NA’ values should be stripped before the computation proceeds.
+    #' @return An IncidenceMatrix with the median over all simulations.
+    median = function(na.rm=FALSE){
+      self$data$summarize(median,na.rm)
     },
-    #' @method quantile Get the cutoffs for each percentile in alphas.
-    #' @param alphas A numeric vector with elements between \code{0} and \code{1} of percentiles to find cutoffs for.
-    #' @return an ArrayData.
-    quantile = function(alphas){
+    #' @method quantile Get the cutoffs for each percentile in probs.
+    #' @param probs A numeric vector with elements between \code{0} and \code{1} of percentiles to find cutoffs for. (Values up to ‘2e-14’ outside that range are accepted and moved to the nearby endpoint.)
+    #' @param na.rm logical; if true, any 'NA' and 'NaN''s are removed from 'x' before the quantiles are computed.
+    #' @param names logical; if true, the result has a 'names' attribute.  Set to 'FALSE' for speedup with many 'probs'.
+    #' @param type an integer between 1 and 9 selecting one of the nine quantile algorithms detailed below to be used.
+    #' @return an ArrayData where the rows and columns correspond to the .
+    quantile = function(probs,na.rm=FALSE,names=TRUE,type=7){
       SimulatedIncidenceMatrix$new(
         lapply(
-          alphas,
+          probs,
           function(alpha){
-            self$data$summarize(function(x){quantile(x , alpha)})
+            self$data$summarize(function(x){quantile(x , alpha,na.rm=na.rm)})
           }
         )
       )
     },
     #' @method binDist Get the distribution of simulations of the data within fixed bins.
-    #' @param cutoffs A numeric vector with elements to use as the dividing values for the bins.
-    #' @return a FrameData.
-    binDist = function(cutoffs){
-      SimulatedIncidenceMatrix$new(
-        lapply(
-          cutoffs,
-          function(cutoff){
-            self$data$summarize(function(x){ecdf(x)(cutoff)})
+    #' @param cutoffs A numeric vector with elements to use as the dividing values for the bins.  -Inf, and Inf will be added automatically.
+    #' @param include.lowest logical, indicating if an x[i] equal to the lowest (or highest, for right = FALSE) breaks value should be included.
+    #' @param right logical, indicating if the intervals should be closed on the right (and open on the left) or vice versa.
+    #' @return an ArrayData.
+    binDist = function(cutoffs,include.lowest = FALSE,right = TRUE){
+      if('binDist' %in% private$.debug){browser()}
+      if(include.lowest | (right)){
+        warning("The interval names will not be correctly formatted")
+      }
+      cutoffs = sort(unique(c(cutoffs,-Inf,Inf)))
+      data <- aperm(
+        apply(
+          self$data$arr,
+          c(1,2),
+          function(x){
+            c(
+              table(cut(
+                x=x,
+                breaks=cutoffs,
+                include.lowest=include.lowest,
+                right=right
+              ))/length(x),
+              "NA"=sum(is.na(x))/length(x)
+            )
           }
-        )
+        ),
+        c(2,3,1)
       )
+      if(!is.null(self$data$rnames)){
+        dimnames(data)[[1]] <- self$data$rnames
+      }
+      if(!is.null(self$data$cnames)){
+        dimnames(data)[[2]] <- self$data$cnames
+      }
+      dimnames(data)[[3]] <- c(paste("[",cutoffs[-length(cutoffs)],",",cutoffs[-1],")",sep=''),"NA")
+      ## Special name for the final box if include.lowest is false
+      dimnames(data)[[3]][length(cutoffs)-1] <- paste('[',cutoffs[length(cutoffs)-1], ",", cutoffs[length(cutoffs)-0],"]",sep='')
+      ## Even in the include.lowest=FALSE case, we want Inf/-Inf to get reported normally
+      if(!include.lowest){
+        tmp.data <- aperm(
+          apply(
+            self$data$arr,
+            c(1,2),
+            function(x){
+              table(cut(
+                x=x,
+                breaks=cutoffs,
+                include.lowest=TRUE,
+                right=right
+              ))/length(x)
+            }
+          ),
+          c(2,3,1)
+        )
+        if(!right){
+          data[,,length(cutoffs)-1] = tmp.data[,,length(cutoffs)-1]
+        } else {
+          data[,,1] = tmp.data[,,1]
+        }
+      }
+      rc <- SimulatedIncidenceMatrix$new( data)
+      rc$rowData <- self$data$rowData
+      rc$colData <- self$data$colData
+      rc$dimData[[3]] <- list(start=c(cutoffs[-length(cutoffs)],NA),end=c(cutoffs[-1],NA))
+      return(rc)
     }
   ),
   active = list(

@@ -100,6 +100,7 @@ RecursiveForecastModel <- R6Class(
     .maxPredCol = as.integer(NA),
     .predCols = as.integer(c(NA)),
     output=SimulatedForecast$new(),
+    .stochastic = 'Deterministic',
     .nrow = NA,
     rownames = c(''),
     .nsim = NA
@@ -201,17 +202,9 @@ RecursiveForecastModel <- R6Class(
     #' @method forecast Using a model previously fit with \code{fit} to predict the next \code{steps} columns.  This function assumes that all of the data preprocessing has already been taken care of.  This function is similar to predict, except that it can predict multiple time steps into the future instead of a single timestep.
     #' @param newdata The data to forecast from.
     #' @param steps The number of timesteps into the future to predict.
-    #' @param stochastic Treat the data as though drawn from a random  distribution, and recover the true value.  Can be used to calculate  confidence intervals, and investigate model sensitivity.
-    #' @param nsims The number of simulations to do if stochastic.
     #' @param addToData Whether or not to mutate the data to incorporate the new predictions.
     #' @return private$output This function should both modify and return private$output.
-    forecast = function(
-      newdata,
-      steps=1,
-      stochastic='Poisson',
-      nsims=self$nsim,
-      addToData = FALSE
-    ){
+    forecast = function(newdata = private$.data,steps=1){
 
       ## for debugging: see AbstractClasses.R::Generic::debug for details.
       if('forecast' %in% private$.debug){
@@ -225,7 +218,6 @@ RecursiveForecastModel <- R6Class(
       }
 
       ##Start by storing the parameter values where appropriate.
-      private$.nsim = nsims
       ncolOld = newdata$ncol
       ##Prepare the output data, so we're ready to forecast.
       self$prepareOutputData(newdata,steps)
@@ -252,13 +244,13 @@ RecursiveForecastModel <- R6Class(
         ##ncolOld + i is where the ith step's prediction should be stored.
         self$predict_(col=ncolOld+i)
         ##We now add noise based on stochastic.
-        if(stochastic == 'Deterministic'){
+        if(private$.stochastic == 'Deterministic'){
           ##Do nothing, because we're deterministic.
-          if(nsims > 1){
+          if(self$nsim > 1){
             warning("If the model is deterministic, then doing multiple simulations is a waste of time.")
           }
         }
-        else if(stochastic == 'Poisson'){
+        else if(private$.stochastic == 'Poisson'){
           ##Note that the SimulatedForecastClass allows us to add the error
           ##  automatically
           ##Simulations::AbstractSimulatedIncidenceMatrix::addError
@@ -272,17 +264,13 @@ RecursiveForecastModel <- R6Class(
           ##General catch all for other noise types.
           stop(paste(
             "Forecasting with option: stochastic =",
-            stochastic,
+            private$.stochastic,
             "is not yet implemented."
           ))
         }
       }
       ##At this point we are finished our forecast.  All that remains is to return
-      if(!addToData){
-        ##Remove all of the old data
-        ##DataContainers.R::MatrixData::tail
-        private$output$tail(k=steps,direction=2)
-      }
+      private$output$tail(k=steps,direction=2)
       return(
         IncidenceForecast$new(
           private$output,
@@ -331,57 +319,20 @@ RecursiveForecastModel <- R6Class(
       ##AbstractClasses.R::Generic::defaultActive
       private$defaultActive('.predCols','private',value)
       private$.maxPredCol = max(private$.predCols)
+    },
+    #' @field stochastic A string with the family of stochastic noise to apply to the recursive process.  Currently only accepts 'Deterministic' and 'Poisson' as values.
+    stochastic = function(value){
+      if(missing(value)){
+        return(private$.stochastic)
+      }
+      if(!(value %in% c('Deterministic','Poisson'))){
+          stop(paste(
+            "Forecasting with option: stochastic =",
+            value,
+            "is not yet implemented."
+          ))
+      }
+      private$.stochastic = value
     }
   )
 )
-
-###############################AggregateForecastModel##########################
-####' @title AggregateForecastModel
-####' @description A collection of models for recursively predicting multiple
-####'   timesteps into the future.  Instead of using the same model to forecast
-####'   every row, this model uses a different model for each row.
-####' @docType class
-####' @importFrom R6 R6Class
-####' @export AggregateForecastModel
-####' @keywords model forecast
-####' @family Models ForecastModels
-####' @example AggregateForecastModel.R
-###AggregateForecastModel <- R6Class(
-###  classname="AggregateForecastModel",
-###  inherit=RecursiveForecastModel,
-###  private = list(
-###    .models = list()
-###    .nrow = 0
-###  ),
-###  public = list(
-###    #' @method fit_ Fit the model for predicting each of the rows. Assumes the data has been  put into place.
-###    #' @param private$.data The data to use in fitting the model is here. private$newdata is an AbstractIncidenceMatrix object, which is mainly a matrix.  The dimensions correspond to Variable - Named row with the variable name as rowname. Instance - Each instance represents a slice of data to be predicted.
-###    fit_ = function(){
-###      for(row in 1:private$.nrow){
-###        self$fitRow_(row)
-###      }
-###    },
-###    #' @method fitRow Fit the model to a particular row.
-###    #' @param data The data to use in fitting the model is here. private$newdata is an AbstractIncidenceMatrix object, which is mainly a matrix.  The dimensions correspond to Variable - Named row with the variable name as rowname. Instance - Each instance represents a slice of data to be predicted.
-###    #' @param row The row to fit a model for.
-###    fitRow = function(data,row){
-###      self$prepareFitData(data)
-###      self$fitRow_(row)
-###    },
-###    #' @method fitRow_ This method \bold{must} be extended.  Fit a model for a particular row.  Assumes the data has been put into place
-###    #' @reference private$newdata The data to use in fitting the model is here. private$newdata is an IncidenceMatrix object, which is mainly a 3D array.  The three dimensions correspond to Variable - Named row with the variable name as rowname. Instance - Each instance represents a slice of data to be predicted
-###    #' @param row The row to predict.
-###    fitRow_ = function(row){
-###      private$.defaultAbstract()
-###    }
-###  ),
-###  active = list(
-###    #' @field models  A list of models, over which to aggregate 
-###    models = function(value){
-###      if(missing(value)){
-###        return(private$.models)
-###      }
-###      stop("Use fit to generate the list of models.")
-###    }
-###  )
-###)

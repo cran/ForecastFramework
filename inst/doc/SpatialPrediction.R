@@ -1,5 +1,7 @@
 ## ----setup, include=FALSE------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ForecastFramework)
 library(DAAG)
 
 ## ----data----------------------------------------------------------------

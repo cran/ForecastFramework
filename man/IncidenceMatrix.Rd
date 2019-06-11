@@ -42,8 +42,10 @@ data$mat
 }
 \section{Fields}{
 \describe{
+\item{cellData}{A list of metadata associated with the cells of the data.}
 \item{cnames}{The names of columns in the data.}
 \item{colData}{A list of metadata associated with the columns of the data.}
+\item{frame}{A data.frame representation of the IncidenceMatrix.  The frame contains all rows/columns as rows of the data frame, and the rows, columns, values and all metadata types as columns.  This is similar to the melt function.}
 \item{mat}{This is the matrix.  For extensibility, it cannot be written to directly and must be modified through methods.}
 \item{metaData}{Any data not part of the main data structure.}
 \item{ncol}{The number of columns in the data.}
@@ -62,6 +64,16 @@ This function adds empty rows to the data.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{rows}{The number of rows to add.}
 }}}}
+\methodname{as_sts(pop_name = 'pop',freq_name = 'freq',start_name = 'start',epoch_name = 'epoch',map_name = 'map',neighbourhood_name = 'neighbourhood')}{
+Convert this object to an sts object with as much information as possible
+\describe{\item{\emph{Arguments}}{\tabular{lcl}{
+\methoditem{pop_name}{string with the name of rowData to use as the population of the sts object.}
+\methoditem{freq_name}{string with the name of metaData to use as the frequency of the sts object.}
+\methoditem{start_name}{string with the name of metaData to use as the start of the sts object.}
+\methoditem{epoch_name}{string with the name of the colData to use as the epoch of the sts object.}
+\methoditem{map_name}{string with the name of the rowData to use as the map of the sts object.}
+\methoditem{neighbourhood_name}{string with the name of the rowData to use as the neighbourhood of th ests object.}
+}}}}
 \methodname{debug(string)}{
 A function for debugging the methods of this class.  It calls the \link{browser} command.  In order for methods to opt into to debugging, they need to implement the following code at the beginning: if(<method_name> \%in\% private$.debug)\{browser()\}.  This method exists, because the debugger is not always intuitive when it comes to debugging R6 methods.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
@@ -71,19 +83,20 @@ A function for debugging the methods of this class.  It calls the \link{browser}
 This function replaces the matrix value at column i with the difference. between the values at columns i and (i-lag).
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{lag}{ How far back to diff.  Defaults to 1.}
-\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing."}
+\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing.}
 }}
 \item{Value}{If \code{mutate=FALSE}, a clone of this object will run the method and be returned.  Otherwise, there is no return.}
 }}
-\methodname{head(k,direction=2)}{
+\methodname{head(k,direction=2,mutate=TRUE)}{
 Select the last \code{k} slices of the data in dimension \code{direction}.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{k}{The number of slices to keep.}
 \methoditem{direction}{The dimension to take a subset of. 1 for row, 2 for column.}
+\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing.}
 }}
 \item{Value}{If \code{mutate=FALSE}, a clone of this object will run the method and be returned.  Otherwise, there is no return.}
 }}
-\methodname{initialize(data=matrix(),metaData=list(),rowData=list(),colData=list())}{
+\methodname{initialize(data=matrix(),metaData=list(),rowData=list(),colData=list(),cellData = list())}{
 Create a new \code{IncidenceMatrix} object from its components.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{data}{Either a matrix, or an object of class MatrixData.  If data is a matrix, it will form the mat field.  If data is a MatrixData, then the new object will inherit all of its fields.}
@@ -92,7 +105,7 @@ Create a new \code{IncidenceMatrix} object from its components.
 This function replaces the current matrix with a new matrix with one  column for every column, and a row for every row/index combination.  The column corresponding to the row and index will have the value of the  original matrix in the same row, but index columns previous.  This  shift will introduce NAs where it passes off the end of the matrix.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{indices}{A sequence of lags to use as part of the data.  Note that unless this list contains 0, the data will all be shifted back by at least one year.}
-\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing."}
+\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing.}
 \methoditem{na.rm}{Whether to remove NA values generated by walking off the edge of the matrix.}
 }}
 \item{Value}{If \code{mutate=FALSE}, a clone of this object will run the method and be returned.  Otherwise, there is no return.}
@@ -117,24 +130,25 @@ This function is a way to modify the data as though it were a matrix.
 This function rescales each element of our object according to f
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{f}{a function which takes in a number and outputs a rescaled version of that number}
-\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing."}
+\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing.}
 }}
 \item{Value}{If \code{mutate=FALSE}, a clone of this object will run the method and be returned.  Otherwise, there is no return.}
 }}
 \methodname{subset(rows,cols,mutate=TRUE)}{
 Select the data corresponding to the rows \code{rows} and the columns \code{columns}.  \code{rows} and \code{columns} can be either numeric or named indices.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
-\methoditem{rows}{An row index or list of row indices which can be either numeric or named."}
-\methoditem{cols}{An column index or list of column indices which can be either numeric or named."}
-\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing."}
+\methoditem{rows}{An row index or list of row indices which can be either numeric or named.}
+\methoditem{cols}{An column index or list of column indices which can be either numeric or named.}
+\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing.}
 }}
 \item{Value}{If \code{mutate=FALSE}, a clone of this object will run the method and be returned.  Otherwise, there is no return.}
 }}
-\methodname{tail(k,direction=2)}{
+\methodname{tail(k,direction=2,mutate=TRUE)}{
 Select the last \code{k} slices of the data in dimension \code{direction}.
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{k}{The number of slices to keep.}
 \methoditem{direction}{The dimension to take a subset of. 1 for row, 2 for column.}
+\methoditem{mutate}{Whether to change the original instance, or create a new one.  If FALSE, the instance performing the method will be left unchanged, and a modified copy will be returned.  If true, then the instance will modify itself and return nothing.}
 }}
 \item{Value}{If \code{mutate=FALSE}, a clone of this object will run the method and be returned.  Otherwise, there is no return.}
 }}
