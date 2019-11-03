@@ -119,7 +119,7 @@ The fit method is supposed to take a data set, and use it to automatically confi
 		  return(IncidenceForecast$new(data=rc))
 		}
 ```
-predict is the main function of the class.  We first introduce extra rows to cover the whole window.  Then we take the average over the window for each row, and store that in the apropriate part of our output.  Notice here that the IncidenceMatrix class does most of the work, and we had very little manual steps.  Ideally, most of the prediction process is actions taken by the data on itself.  This allows us to make as few assumptions about the data as possible.
+predict is the main function of the class.  We first introduce extra rows to cover the whole window.  Then we take the average over the window for each row, and store that in the appropriate part of our output.  Notice here that the IncidenceMatrix class does most of the work, and we had very little manual steps.  Ideally, most of the prediction process is actions taken by the data on itself.  This allows us to make as few assumptions about the data as possible.
 
 
 ```{r Model Full,echo=TRUE}

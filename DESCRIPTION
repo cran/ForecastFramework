@@ -1,6 +1,6 @@
 Package: ForecastFramework
 Title: A Basis for Modular Model Creation
-Version: 0.10.1
+Version: 0.10.2
 Authors@R: c(
   person("Joshua", "Kaminsky", email = "jkaminsky@jhu.edu", role = c("aut", "cre")),
   person("Justin", "Lessler", email = "justin@jhu.edu", role = c("aut")),
@@ -21,9 +21,9 @@ Collate: 'AbstractClasses.R' 'DataContainers.R' 'Forecasts.R'
         'MoveAheadModel.R' 'ObservationList.R'
 VignetteBuilder: knitr
 NeedsCompilation: no
-Packaged: 2019-06-11 16:34:13 UTC; jkaminsky
+Packaged: 2019-11-03 01:59:52 UTC; jkaminsky
 Author: Joshua Kaminsky [aut, cre],
   Justin Lessler [aut],
   Nicholas Reich [aut]
 Repository: CRAN
-Date/Publication: 2019-06-11 17:30:02 UTC
+Date/Publication: 2019-11-03 05:20:02 UTC
