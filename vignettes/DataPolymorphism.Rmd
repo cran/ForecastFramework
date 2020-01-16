@@ -13,7 +13,6 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ForecastFramework)
-library(DAAG)
 ```
 
 An important aspect of our efforts here is to allow models to automatically determine whether or not data is appropriate to use the model on.  Ideally, we want our data to be as broadly applicable as is reasonable, regardless of its storage.  We can accomplish this using `polymorphism`, a way for different objects to have the same behaviours.  Consider the following two sources of data:
@@ -26,7 +25,6 @@ listFormData = ObservationList$new(
 ```
 and 
 ```{r}
-library(DAAG)
 data("bomregions")
 matrix_data = t(bomregions[1:8,c(10:17)])
 matrixFormData = IncidenceMatrix$new(

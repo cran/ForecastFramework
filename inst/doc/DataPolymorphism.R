@@ -2,7 +2,6 @@
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ForecastFramework)
-library(DAAG)
 
 ## ------------------------------------------------------------------------
 data("Orange")
@@ -11,7 +10,6 @@ listFormData = ObservationList$new(
 )
 
 ## ------------------------------------------------------------------------
-library(DAAG)
 data("bomregions")
 matrix_data = t(bomregions[1:8,c(10:17)])
 matrixFormData = IncidenceMatrix$new(

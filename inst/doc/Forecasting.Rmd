@@ -13,7 +13,6 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ForecastFramework)
-library(DAAG)
 ```
 ##Overview
 
@@ -57,7 +56,6 @@ To start, we look at the ForecastModel class (It may be better to look at its he
 ####Data
 Before we make our model, lets consider the data we want to look at.  The `bomregions` data from the `DAAG` package contains rainfall information for various regions over time.  Given this information, we may want to create a model to see which Region will have the highest rainfall over the next few years.
 ```{r}
-library(DAAG)
 data("bomregions")
 data_matrix = t(bomregions[,10:17])
 colnames(data_matrix) = bomregions[,1]

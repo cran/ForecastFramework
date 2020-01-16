@@ -13,7 +13,6 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ForecastFramework)
-library(DAAG)
 ```
 ##Overview
 
@@ -24,7 +23,6 @@ Spatial Prediction cares about making models based on spatially distributed data
 Suppose we want to use the following data to model rainfall over time in the various regions given below.
 
 ```{r data}
-library(DAAG)
 data("bomregions")
 matrix_data = t(bomregions[1:8,c(10:17)])
 colnames(matrix_data) = bomregions[1:8,1]

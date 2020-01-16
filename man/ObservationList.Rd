@@ -41,7 +41,7 @@ In order to use an ObservationList as an ArrayData, you need to select which col
 \methoditem{val}{The attribute of frame to use for the values of the array (must \code{aggregate}_ to a numeric type)}
 \methoditem{dimData}{A list containing for each dimension of the array, the attribute(s) of \code{frame} which are associated with that dimension.}
 }}}}
-\methodname{initialize(data=data_frame(),...)}{
+\methodname{initialize(data=tibble::tibble(),...)}{
 Create a new ObservationList with \code{frame} given by \code{data}
 \describe{\item{\emph{Arguments}}{\tabular{lcl}{
 \methoditem{data}{A data frame to use as the frame of the ObservationList}

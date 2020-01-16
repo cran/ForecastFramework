@@ -2,10 +2,8 @@
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ForecastFramework)
-library(DAAG)
 
 ## ----data----------------------------------------------------------------
-library(DAAG)
 data("bomregions")
 matrix_data = t(bomregions[1:8,c(10:17)])
 colnames(matrix_data) = bomregions[1:8,1]

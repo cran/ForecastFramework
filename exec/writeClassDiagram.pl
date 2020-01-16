@@ -542,34 +542,23 @@ foreach my $class_name (sort keys %final_classes){
     if(!($documentation{$class_name} =~ /\#' \@keywords .+/)){
     }
     if($documentation{$class_name} =~ /\#' \@family (.+)/){
-      my $any_exist = 0;
+      print MAN "\\seealso{\n";
       if($documentation{$superclasses{$class_name}} =~ /#' \@export/){
-        $any_exist = 1;
+        print MAN "Inherits from : \\code{\\link{$superclasses{$class_name}}}\n\n";
       }
+      my $any_subclasses = 0;
       foreach my $other_class (sort keys %final_classes){
         if(exists($superclasses{$other_class}) and ($superclasses{$other_class} eq $class_name)){
-          $any_exist = 1;
-        }
-      }
-      if($any_exist == 1){
-        print MAN "\\seealso{\n";
-        if($documentation{$superclasses{$class_name}} =~ /#' \@export/){
-          print MAN "Inherits from : \\code{\\link{$superclasses{$class_name}}}\n\n";
-        }
-        my $any_subclasses = 0;
-        foreach my $other_class (sort keys %final_classes){
-          if(exists($superclasses{$other_class}) and ($superclasses{$other_class} eq $class_name)){
-            if($any_subclasses == 0){
-              print MAN "Is inherited by : ";
-              $any_subclasses = 1;
-            } else {
-              print MAN ", ";
-            }
-            print MAN "\\code{\\link{$other_class}}";
+          if($any_subclasses == 0){
+            print MAN "Is inherited by : ";
+            $any_subclasses = 1;
+          } else {
+            print MAN ", ";
           }
+          print MAN "\\code{\\link{$other_class}}";
         }
-        print MAN "}\n";
       }
+      print MAN "}\n";
     }
     if($documentation{$class_name} =~ /\#' \@example (.+)/){
       print "$1\n";
